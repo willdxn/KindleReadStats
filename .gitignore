@@ -45,5 +45,11 @@ docs/
 # translation temp files
 po/*~
 
+# project specific
+data/*
+data.zip
+extractor2.R
+export.xlsx
+
 # RStudio Connect folder
 rsconnect/
