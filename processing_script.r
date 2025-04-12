@@ -2,9 +2,10 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 library(tidyr)
-library(ggthemes)
 library(openxlsx)
-
+library(htmlwidgets)
+library(htmltools)
+library(plotly)
 
 # reading metadata
 df_ReadingSession <- read.csv(unz("data.zip", "Kindle.Devices.ReadingSession/Kindle.Devices.ReadingSession.csv"))
@@ -98,14 +99,13 @@ df_ReadPerYear <- df_ReadingSession %>%
     session_count = n()
   )
 
-ggplot(df_ReadPerYear, aes(x = year, y = total_minutes)) +
+p_ReadPerYear <- ggplot(df_ReadPerYear, aes(x = year, y = total_minutes)) +
   geom_col() +
   labs(
     title = "Total reading time per year (mins)",
     x = "Years", y = "Minutes",
     caption = "Data from Amazon. Analysis by Will Dixon based on a design by Jake Lee."
-  ) +
-  theme_fivethirtyeight()
+  )
 
 # total and average reading time per hour of day
 df_ReadPerHour <- df_ReadingSession %>%
@@ -121,15 +121,13 @@ df_ReadPerHour <- df_ReadingSession %>%
     session_count = n()
   )
 
-ggplot(df_ReadPerHour, aes(x = hour_of_day, y = total_minutes)) +
+p_ReadPerHour <- ggplot(df_ReadPerHour, aes(x = hour_of_day, y = total_minutes)) +
   geom_col() +
   labs(
     title = "Total reading time per hour of day (mins)",
     x = "Hour", y = "", color = "Metric",
     caption = "Data from Amazon. Analysis by Will Dixon based on a design by Jake Lee."
-  ) +
-  theme_fivethirtyeight()
-
+  )
 # pages read per day throughout time, quite inefficient.
 # initial filtering
 df_ReadingSession$end_timestamp <- as.POSIXct(df_ReadingSession$end_timestamp)
@@ -158,16 +156,14 @@ df_ReadPerWeek_anomexcl <- df_ReadPerWeek %>%
   filter(n() >= 5) %>%
   ungroup()
 
-ggplot(df_ReadPerWeek_anomexcl, aes(x = week, y = total_reading_minutes)) +
+p_ReadPerWeek <- ggplot(df_ReadPerWeek_anomexcl, aes(x = week, y = total_reading_minutes)) +
   geom_line() +
   labs(
     title = "Time spent reading as an average per week",
     subtitle = "For years that have >5 weeks of reading data",
     x = "Week", y = "",
     caption = "Data from Amazon. Analysis by Will Dixon based on a design by Jake Lee."
-  ) +
-  theme_fivethirtyeight()
-
+  )
 # average time spent reading per month in a year
 df_ReadPerMonth <- df_ReadPerWeek_anomexcl %>%
   mutate(month = month(week)) %>%
@@ -180,7 +176,7 @@ df_ReadPerMonth <- df_ReadPerWeek_anomexcl %>%
   mutate(month_label = factor(month_label, levels = month.abb))
 
 # plots the average across each month
-ggplot(df_ReadPerMonth, aes(x = month_label, y = avg_monthly_minutes, group = 1)) +
+p_ReadPerMonth <- ggplot(df_ReadPerMonth, aes(x = month_label, y = avg_monthly_minutes, group = 1)) +
   geom_col() +
   labs(
     title = "Average monthly reading time",
@@ -188,10 +184,10 @@ ggplot(df_ReadPerMonth, aes(x = month_label, y = avg_monthly_minutes, group = 1)
     x = "Month",
     y = "Average Total Reading Minutes",
     caption = "Data from Amazon. Analysis by Will Dixon based on a design by Jake Lee."
-  ) +
-  theme_fivethirtyeight()
+  )
 
-# creating data export for excel (if requested)
+# exporting reading insights (temporary) ---------------------------------------------------
+# creating data export for excel
 
 wb <- createWorkbook()
 
@@ -205,3 +201,35 @@ addWorksheet(wb, "ReadPerMonth")
 writeData(wb, "ReadPerMonth", df_ReadPerMonth)
 
 saveWorkbook(wb, "export.xlsx", overwrite = TRUE)
+
+
+## BELOW IS WIP --------------------------------------------------------------------------
+
+# creating an interactive output
+# Convert ggplot objects to interactive Plotly objects
+p1_interactive <- ggplotly(p_ReadPerYear)
+p2_interactive <- ggplotly(p_ReadPerHour)
+p3_interactive <- ggplotly(p_ReadPerWeek)
+p4_interactive <- ggplotly(p_ReadPerMonth)
+
+# turn all of the interactive plots into a html page
+combined_plots <- tagList(
+  h1("Interactive Kindle Reading Insights"),
+  h2("Total Reading Time per Year"),
+  p1_interactive,
+  hr(),
+  h2("Total Reading Time per Hour"),
+  p2_interactive,
+  hr(),
+  h2("Weekly Average Reading Time"),
+  p3_interactive,
+  hr(),
+  h2("Monthly Average Reading Time"),
+  p4_interactive
+)
+
+# save visualisations to a html file for now
+saveWidget(browsable(combined_plots), file = "plots.html", selfcontained = TRUE)
+
+# open the exported file
+browseURL("plots.html")
